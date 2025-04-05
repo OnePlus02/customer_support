@@ -1,8 +1,7 @@
-<!-- client.html -->
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mobile Screen Sharing</title>
+  <title>Share Your Screen</title>
 </head>
 <body>
   <h2>Share Your Screen</h2>
@@ -10,17 +9,17 @@
 
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
   <script>
-    // Replace with your Firebase config
     const firebaseConfig = {
-  apiKey: "AIzaSyCo92JlFG-oG_A_L-I_ea_UDvpjpNZrYgk",
-  authDomain: "screen-c97b0.firebaseapp.com",
-  databaseURL: "https://screen-c97b0-default-rtdb.firebaseio.com",
-  projectId: "screen-c97b0",
-  storageBucket: "screen-c97b0.firebasestorage.app",
-  messagingSenderId: "379057050804",
-  appId: "1:379057050804:web:4df1ee19328f2f42f973e1"
-};
+      apiKey: "AIzaSyCo92JlFG-oG_A_L-I_ea_UDvpjpNZrYgk",
+      authDomain: "screen-c97b0.firebaseapp.com",
+      databaseURL: "https://screen-c97b0-default-rtdb.firebaseio.com",
+      projectId: "screen-c97b0",
+      storageBucket: "screen-c97b0.firebasestorage.app",
+      messagingSenderId: "379057050804",
+      appId: "1:379057050804:web:4df1ee19328f2f42f973e1"
+    };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
@@ -28,29 +27,43 @@
 
     peer.onicecandidate = event => {
       if (event.candidate) {
+        console.log("Sending ICE candidate...");
         db.ref("callerCandidates").push(event.candidate.toJSON());
       }
     };
 
     document.getElementById("start").onclick = async () => {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      stream.getTracks().forEach(track => peer.addTrack(track, stream));
+      console.log("Start button clicked");
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        console.log("Screen stream captured:", stream);
+        stream.getTracks().forEach(track => peer.addTrack(track, stream));
 
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      db.ref("offer").set(offer);
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        console.log("Offer created", offer);
+        await db.ref("offer").set(offer);
 
-      db.ref("answer").on("value", async snapshot => {
-        const answer = snapshot.val();
-        if (answer && !peer.currentRemoteDescription) {
-          await peer.setRemoteDescription(new RTCSessionDescription(answer));
-        }
-      });
+        db.ref("answer").on("value", async snapshot => {
+          const answer = snapshot.val();
+          if (answer && !peer.currentRemoteDescription) {
+            console.log("Answer received");
+            await peer.setRemoteDescription(new RTCSessionDescription(answer));
+          }
+        });
 
-      db.ref("adminCandidates").on("child_added", snapshot => {
-        const candidate = new RTCIceCandidate(snapshot.val());
-        peer.addIceCandidate(candidate);
-      });
+        db.ref("adminCandidates").on("child_added", snapshot => {
+          const candidate = snapshot.val();
+          if (candidate) {
+            console.log("Admin ICE candidate received");
+            peer.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+        });
+
+      } catch (err) {
+        console.error("Error while screen sharing:", err);
+        alert("Screen sharing failed: " + err.message);
+      }
     };
   </script>
 </body>
