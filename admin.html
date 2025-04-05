@@ -1,0 +1,61 @@
+<!-- admin.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Screen Viewer</title>
+</head>
+<body>
+  <h2>Viewing User's Screen</h2>
+  <video id="screen" autoplay playsinline style="width:100%;border:1px solid #000;"></video>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script>
+    // Same Firebase config
+    var firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "YOUR_DB_URL",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const peer = new RTCPeerConnection();
+
+    peer.onicecandidate = event => {
+      if (event.candidate) {
+        db.ref("adminCandidates").push(event.candidate.toJSON());
+      }
+    };
+
+    peer.ontrack = event => {
+      document.getElementById("screen").srcObject = event.streams[0];
+    };
+
+    async function start() {
+      const offerSnapshot = await db.ref("offer").once("value");
+      const offer = offerSnapshot.val();
+      if (!offer) {
+        alert("Waiting for user to share screen...");
+        return;
+      }
+
+      await peer.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+      db.ref("answer").set(answer);
+
+      db.ref("callerCandidates").on("child_added", snapshot => {
+        const candidate = new RTCIceCandidate(snapshot.val());
+        peer.addIceCandidate(candidate);
+      });
+    }
+
+    start();
+  </script>
+</body>
+</html>
